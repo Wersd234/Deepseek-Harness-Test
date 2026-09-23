@@ -1,0 +1,65 @@
+# Discord Bot（最小可 Docker 部署示例）
+
+基于 [discord.py](https://discordpy.readthedocs.io/en/stable/) v2 的最小机器人：
+支持前缀命令（`!ping`、`!hello`）与 Slash 命令（`/ping`、`/info`），启动时自动同步 slash 命令。
+Token 等敏感信息通过 `.env` 注入，**不会**被提交到 git、也不会写入镜像。
+
+## 项目结构
+
+```
+├── bot.py              # 机器人主程序
+├── requirements.txt    # Python 依赖
+├── Dockerfile          # 容器镜像定义
+├── docker-compose.yml  # 一键部署
+├── .env.example        # 环境变量模板（可提交）
+├── .env                # 真实 token（已被 .gitignore 忽略）
+└── .gitignore / .dockerignore
+```
+
+## 一、创建 Discord 应用
+
+1. 打开 <https://discord.com/developers/applications> → **New Application**
+2. 左侧 **Bot** → **Reset Token**，复制 token
+3. 同一页面开启 **Privileged Gateway Intents** 中的 **MESSAGE CONTENT INTENT**（本 bot 读取消息内容必需）
+4. 左侧 **OAuth2 → URL Generator**：勾选 scope `bot` + `applications.commands`，
+   Bot Permissions 至少勾 `Send Messages`、`Read Message History`，
+   用生成的 URL 邀请 bot 进你的服务器
+
+## 二、本地运行（不用 Docker）
+
+```bash
+python -m venv .venv
+# Windows: .venv\Scripts\activate   Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env      # 然后编辑 .env 填入 DISCORD_TOKEN
+python bot.py
+```
+
+## 三、Docker 部署
+
+```bash
+cp .env.example .env      # 填入 DISCORD_TOKEN
+docker compose up -d --build    # 构建并后台启动
+docker compose logs -f          # 查看日志，看到 "已登录: ..." 即成功
+docker compose down             # 停止
+```
+
+不使用 compose 的等价命令：
+
+```bash
+docker build -t discord-bot .
+docker run -d --restart unless-stopped --env-file .env --name discord-bot discord-bot
+```
+
+## 四、命令列表
+
+| 命令 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| `!ping` / `/ping` | 前缀 / Slash | 返回延迟 |
+| `!hello` | 前缀 | 打招呼 |
+| `/info` | Slash | 机器人信息（Embed） |
+
+## 安全提示
+
+- `.env` 已在 `.gitignore` / `.dockerignore` 中，**永远不要把真实 token 提交到 git**
+- 若 token 泄露，立即到开发者门户 Reset Token

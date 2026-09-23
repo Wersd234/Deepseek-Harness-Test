@@ -1,0 +1,6 @@
+services:
+  bot:
+    build: .
+    container_name: discord-bot
+    env_file: .env        # token 从宿主机 .env 注入，不写入镜像
+    restart: unless-stopped
