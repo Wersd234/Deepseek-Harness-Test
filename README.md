@@ -51,7 +51,27 @@ docker build -t discord-bot .
 docker run -d --restart unless-stopped --env-file .env --name discord-bot discord-bot
 ```
 
-## 四、命令列表
+## 四、Portainer 部署（Stacks）
+
+> 注意：`.env` 不会提交到 git，所以 Portainer 从仓库拉代码后目录里没有 `.env`。
+> 变量请在 Portainer 界面里配置，compose 已改为 `${VAR}` 插值方式读取。
+
+1. **Stacks → Add stack**，命名如 `discord-bot`
+2. Build method 选 **Repository**：
+   - Repository: `https://github.com/Wersd234/Deepseek-Harness-Test.git`
+   - Branch: `main`
+3. 在页面下方的 **Environment variables** 区域添加：
+   - `DISCORD_TOKEN` = 你的 bot token（**不要**勾选 "New secret"，普通环境变量即可）
+   - `COMMAND_PREFIX` = `!`（可选，不填默认 `!`）
+4. **Deploy the stack**
+5. 在 Stack 的日志里看到 `已登录: xxx` 与 `已同步 2 个 slash 命令` 即成功
+6. 以后更新代码后：进入 Stack → **Re-deploy the stack**（勾选 *Re-pull image and redeploy* 如有）
+
+如果误删了 Stack 里的变量，容器启动会在日志中打印
+`缺少 DISCORD_TOKEN：请复制 .env.example 为 .env 并填入 Bot Token`，补上变量重新部署即可。
+
+
+## 五、命令列表
 
 | 命令 | 类型 | 说明 |
 | ---- | ---- | ---- |

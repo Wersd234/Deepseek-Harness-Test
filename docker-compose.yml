@@ -2,5 +2,11 @@ services:
   bot:
     build: .
     container_name: discord-bot
-    env_file: .env        # token 从宿主机 .env 注入，不写入镜像
+    # 兼容本地 docker compose 与 Portainer：
+    # - 本地：docker compose 自动读取项目目录下的 .env 做变量插值
+    # - Portainer：在 Stack 的 Environment variables 中配置同名变量
+    #   （不要再用 env_file: .env，Portainer 项目目录里没有该文件会报错）
+    environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN:-}
+      COMMAND_PREFIX: ${COMMAND_PREFIX:-!}
     restart: unless-stopped
