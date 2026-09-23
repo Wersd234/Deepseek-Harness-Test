@@ -30,9 +30,15 @@ class Bot(commands.Bot):
     """启动时自动同步 slash 命令的 Bot。"""
 
     async def setup_hook(self) -> None:
+        # 版本兼容：discord.py 2.4/2.5 用 tree.synchronize()，2.6+ 改回 tree.sync()
+        tree_sync = getattr(self.tree, "synchronize", None) or self.tree.sync
         # 全局同步，约 1 秒生效；如需仅测试服务器可传 guild=...
-        synced = await self.tree.synchronize()
-        print(f"已同步 {len(synced)} 个 slash 命令")
+        # 同步失败（如 bot 未被邀请 applications.commands scope）只告警，不让进程崩溃
+        try:
+            synced = await tree_sync()
+            print(f"已同步 {len(synced)} 个 slash 命令")
+        except discord.HTTPException as exc:
+            print(f"slash 命令同步失败（前缀命令不受影响）: {exc}")
 
 
 bot = Bot(command_prefix=PREFIX, intents=intents)
