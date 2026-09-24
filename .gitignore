@@ -10,3 +10,6 @@ venv/
 
 # Docker / 本地数据
 *.log
+
+# 应用本地数据（缓存/状态，不入库）
+data/ptvbot.json
