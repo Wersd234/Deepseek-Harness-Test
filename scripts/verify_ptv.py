@@ -1,51 +1,65 @@
-"""主文档 §11.1 curl 验证脚本的 Python 等价实现。
+"""主文档 §11.1：手动验证 PTV Timetable API 凭证（curl 的等价 Python 版）。
 
-用法：.venv\\Scripts\\python scripts\\verify_ptv.py
-从 .env 读取 PTV_API_BASE / PTV_DEVID / PTV_KEY，请求一次周边搜索接口，
-打印返回的 route_type 列表；恰好 5 种即视为凭证有效（M0 验收标准）。
+拿到 devid / key 后第一件事先跑这个，确认凭证可用再写代码。
+用法：确保 .env 里填了 PTV_DEVID / PTV_KEY（PTV_API_BASE 默认官方地址），然后：
+    .venv\\Scripts\\python.exe scripts\\verify_ptv.py
+退出码 0 = 凭证有效（返回 5 种 route_type）。
 
-注意：PTV_API_BASE 的确切取值以主文档 §11.1 的 curl 脚本为准，
-      拿到主文档后如有出入请同步修改本脚本的路径拼接。
+签名方式（§11.1）：HMAC-SHA1(key, path含query、不含host)，十六进制，&signature= 附加在 URL 尾部。
 """
+import hashlib
+import hmac
+import json
 import os
 import sys
-import urllib.parse
+import urllib.error
 import urllib.request
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-API_BASE = os.getenv("PTV_API_BASE", "").rstrip("/")
+# 控制台可能是 GBK，强制 UTF-8 输出避免 UnicodeEncodeError
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 DEVID = os.getenv("PTV_DEVID", "")
 KEY = os.getenv("PTV_KEY", "")
+API_BASE = (os.getenv("PTV_API_BASE") or "https://timetableapi.ptv.vic.gov.au").rstrip("/")
+
+
+def sign(path_and_query: str) -> str:
+    """§11.1: HMAC-SHA1(key, "/v3/...?devid=...") —— 只签 path+query，不含 host。"""
+    return hmac.new(KEY.encode(), path_and_query.encode(), hashlib.sha1).hexdigest()
 
 
 def main() -> int:
-    if not (API_BASE and DEVID and KEY):
-        print("缺少 PTV_API_BASE / PTV_DEVID / PTV_KEY，请先在 .env 中填写（见 .env.example）")
+    if not DEVID or not KEY:
+        print("❌ 未配置 PTV_DEVID / PTV_KEY —— 请在 .env 填入后重试")
         return 2
-
-    url = f"{API_BASE}/geo/devid/{DEVID}/key/{KEY}/route/1/lat/52.52/lon/13.405/maxdist/2000"
-    print(f"GET {url.replace(KEY, '***')}")
-    req = urllib.request.Request(url, headers={"User-Agent": "ptvbot-m0-verify/1.0"})
+    pathq = f"/v3/route_types?devid={DEVID}"
+    url = f"{API_BASE}{pathq}&signature={sign(pathq)}"
+    print(f"GET {url.rsplit('signature=', 1)[0]}signature=***")
+    req = urllib.request.Request(url, headers={"User-Agent": "ptvbot-m0/1.0"})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
-            body = resp.read().decode("utf-8", "replace")
-            print(f"HTTP {resp.status}, {len(body)} bytes")
-    except Exception as exc:  # noqa: BLE001
-        print(f"请求失败: {exc}")
+            status = resp.status
+            raw = resp.read().decode("utf-8", "errors=replace")
+    except urllib.error.HTTPError as exc:
+        # §11.1: 403 多半是签名串拼错（比如把 host 也签进去了）
+        print(f"HTTP {exc.status}: {exc.read().decode('utf-8', errors='replace')[:500]}")
+        print("❌ 凭证验证失败" + ("（403：检查签名串是否多签了 host）" if exc.status == 403 else ""))
         return 1
 
-    route_types = sorted({p for p in body.split('"')[1::2] if p.isupper() and p.isalpha()})
-    # 兜底：直接在全文里统计已知 5 种 route_type 关键字
-    known = [t for t in ("TRAM", "BUS", "U-BAHN", "S-BAHN", "RAIL") if f'"{t}"' in body or t in body]
-    print(f"检测到的 route_type: {route_types or known}")
-    n = len(set(route_types) | set(known))
-    if n == 5:
-        print("✅ PTV 凭证有效：返回 5 种 route_type")
+    data = json.loads(raw)
+    print(json.dumps(data, ensure_ascii=False, indent=2))
+    route_types = data.get("route_types", [])
+    names = [rt.get("route_type_name") for rt in route_types]
+    if len(route_types) == 5:
+        print(f"✅ 凭证有效：返回 5 种 route_type {names}")
         return 0
-    print(f"❌ 期望 5 种 route_type，实际 {n} 种——请核对主文档 §11.1 的 URL 与凭证")
+    print(f"❌ 预期 5 种 route_type，实际 {len(route_types)} 种")
     return 1
 
 

@@ -8,7 +8,7 @@ Token / PTV 凭证通过 `.env` 注入，**不会**被提交到 git、也不会�
 
 | 里程碑 | 状态 |
 |---|---|
-| [M0 — 环境与凭证](M0-environment-setup.md) | 🟡 进行中（代码与环境就绪；凭证填入与 /ping 实测待完成） |
+| [M0 — 环境与凭证](M0-environment-setup.md) | ✅ 完成（2026-09-24：bot 上线 `/ping` 已注册 dev 服；PTV 凭证验证通过，返回 5 种 route_type） |
 
 ## 项目结构
 
